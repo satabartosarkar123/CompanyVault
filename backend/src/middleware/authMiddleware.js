@@ -10,7 +10,13 @@ export const authenticateUser = async (req, res, next) => {
     }
     
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const result = await pool.query('SELECT * FROM users WHERE id = $1', [decoded.userId]);
+    const userId = decoded.userId ?? decoded.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
     
     if (result.rows.length === 0) {
       return res.status(401).json({ error: 'Invalid token' });

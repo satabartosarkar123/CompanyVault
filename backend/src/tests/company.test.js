@@ -1,8 +1,8 @@
-import request from 'supertest';
 import { jest } from '@jest/globals';
 import app from '../server.js';
 import pool from '../config/db.js';
 import jwt from 'jsonwebtoken';
+import { performRequest } from './utils/requestHelper.js';
 
 // Set test environment
 process.env.NODE_ENV = 'test';
@@ -32,7 +32,8 @@ describe('Company Endpoints', () => {
         name VARCHAR(255) NOT NULL,
         description TEXT,
         address TEXT,
-        logo TEXT,
+        logo_url TEXT,
+        banner_url TEXT,
         owner_id INTEGER REFERENCES users(id),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -48,7 +49,6 @@ describe('Company Endpoints', () => {
     // Clean up database
     await pool.query('DELETE FROM companies');
     await pool.query('DELETE FROM users');
-    await pool.end();
     
     // Restore console logs
     console.log.mockRestore();
@@ -73,14 +73,16 @@ describe('Company Endpoints', () => {
 
   describe('POST /api/company/register', () => {
     it('should register a new company with valid data', async () => {
-      const res = await request(app)
-        .post('/api/company/register')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({
+      const res = await performRequest(app, {
+        method: 'POST',
+        path: '/api/company/register',
+        headers: { Authorization: `Bearer ${userToken}` },
+        body: {
           name: 'Test Company',
           description: 'A test company',
           address: '123 Test Street'
-        });
+        },
+      });
 
       expect(res.statusCode).toBe(201);
       expect(res.body).toHaveProperty('name', 'Test Company');
@@ -90,41 +92,47 @@ describe('Company Endpoints', () => {
     });
 
     it('should reject company registration without authentication', async () => {
-      const res = await request(app)
-        .post('/api/company/register')
-        .send({
+      const res = await performRequest(app, {
+        method: 'POST',
+        path: '/api/company/register',
+        body: {
           name: 'Test Company',
           description: 'A test company',
           address: '123 Test Street'
-        });
+        },
+      });
 
       expect(res.statusCode).toBe(401);
       expect(res.body).toHaveProperty('error', 'No token provided');
     });
 
     it('should reject company registration with invalid token', async () => {
-      const res = await request(app)
-        .post('/api/company/register')
-        .set('Authorization', 'Bearer invalid-token')
-        .send({
+      const res = await performRequest(app, {
+        method: 'POST',
+        path: '/api/company/register',
+        headers: { Authorization: 'Bearer invalid-token' },
+        body: {
           name: 'Test Company',
           description: 'A test company',
           address: '123 Test Street'
-        });
+        },
+      });
 
       expect(res.statusCode).toBe(401);
       expect(res.body).toHaveProperty('error', 'Invalid token');
     });
 
     it('should reject company registration with short name', async () => {
-      const res = await request(app)
-        .post('/api/company/register')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({
+      const res = await performRequest(app, {
+        method: 'POST',
+        path: '/api/company/register',
+        headers: { Authorization: `Bearer ${userToken}` },
+        body: {
           name: 'A',
           description: 'A test company',
           address: '123 Test Street'
-        });
+        },
+      });
 
       expect(res.statusCode).toBe(400);
       expect(res.body).toHaveProperty('error', 'Validation failed');
@@ -138,12 +146,14 @@ describe('Company Endpoints', () => {
     });
 
     it('should accept company registration with minimal data', async () => {
-      const res = await request(app)
-        .post('/api/company/register')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({
+      const res = await performRequest(app, {
+        method: 'POST',
+        path: '/api/company/register',
+        headers: { Authorization: `Bearer ${userToken}` },
+        body: {
           name: 'Minimal Company'
-        });
+        },
+      });
 
       expect(res.statusCode).toBe(201);
       expect(res.body).toHaveProperty('name', 'Minimal Company');
@@ -164,9 +174,11 @@ describe('Company Endpoints', () => {
     });
 
     it('should return company profile for authenticated user', async () => {
-      const res = await request(app)
-        .get('/api/company/profile')
-        .set('Authorization', `Bearer ${userToken}`);
+      const res = await performRequest(app, {
+        method: 'GET',
+        path: '/api/company/profile',
+        headers: { Authorization: `Bearer ${userToken}` },
+      });
 
       expect(res.statusCode).toBe(200);
       expect(res.body).toHaveProperty('name', 'Test Company');
@@ -176,17 +188,21 @@ describe('Company Endpoints', () => {
     });
 
     it('should reject profile request without authentication', async () => {
-      const res = await request(app)
-        .get('/api/company/profile');
+      const res = await performRequest(app, {
+        method: 'GET',
+        path: '/api/company/profile',
+      });
 
       expect(res.statusCode).toBe(401);
       expect(res.body).toHaveProperty('error', 'No token provided');
     });
 
     it('should reject profile request with invalid token', async () => {
-      const res = await request(app)
-        .get('/api/company/profile')
-        .set('Authorization', 'Bearer invalid-token');
+      const res = await performRequest(app, {
+        method: 'GET',
+        path: '/api/company/profile',
+        headers: { Authorization: 'Bearer invalid-token' },
+      });
 
       expect(res.statusCode).toBe(401);
       expect(res.body).toHaveProperty('error', 'Invalid token');

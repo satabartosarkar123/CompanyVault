@@ -1,7 +1,7 @@
-import request from 'supertest';
 import { jest } from '@jest/globals';
 import app from '../server.js';
 import pool from '../config/db.js';
+import { performRequest } from './utils/requestHelper.js';
 
 // Set test environment
 process.env.NODE_ENV = 'test';
@@ -29,7 +29,8 @@ describe('Auth Endpoints', () => {
         name VARCHAR(255) NOT NULL,
         description TEXT,
         address TEXT,
-        logo TEXT,
+        logo_url TEXT,
+        banner_url TEXT,
         owner_id INTEGER REFERENCES users(id),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -45,7 +46,6 @@ describe('Auth Endpoints', () => {
     // Clean up database
     await pool.query('DELETE FROM companies');
     await pool.query('DELETE FROM users');
-    await pool.end();
     
     // Restore console logs
     console.log.mockRestore();
@@ -59,59 +59,73 @@ describe('Auth Endpoints', () => {
   });
 
   it('should register new user', async () => {
-    const res = await request(app)
-      .post('/api/auth/register')
-      .send({
-        email: "test@mail.com",
-        password: "12345678",
-        fullname: "Test",
-        gender: "M",
-        mobileno: "12345678",
-        signuptype: "email"
-      });
+    const res = await performRequest(app, {
+      method: 'POST',
+      path: '/api/auth/register',
+      body: {
+        email: 'test@mail.com',
+        password: '12345678',
+        fullname: 'Test',
+        gender: 'M',
+        mobileno: '12345678',
+        signuptype: 'email',
+      },
+    });
 
     expect(res.statusCode).toEqual(201);
-    expect(res.body).toHaveProperty('userId');
-    expect(res.body).toHaveProperty('message', 'Registered! Please verify email & mobile.');
+    expect(res.body).toHaveProperty('token');
+    expect(res.body).toHaveProperty('user');
+    expect(res.body.user).toMatchObject({
+      email: 'test@mail.com',
+      fullname: 'Test',
+      gender: 'M',
+      mobileno: '12345678',
+      signuptype: 'email',
+    });
+    expect(res.body).toHaveProperty('company', null);
   });
 
   it('should prevent duplicate email registration', async () => {
-    // Register first user
-    await request(app)
-      .post('/api/auth/register')
-      .send({
+    await performRequest(app, {
+      method: 'POST',
+      path: '/api/auth/register',
+      body: {
         email: "test@mail.com",
         password: "12345678",
         fullname: "Test",
         gender: "M",
         mobileno: "12345678",
         signuptype: "email"
-      });
+      },
+    });
 
-    // Try to register with same email
-    const res = await request(app)
-      .post('/api/auth/register')
-      .send({
+    const res = await performRequest(app, {
+      method: 'POST',
+      path: '/api/auth/register',
+      body: {
         email: "test@mail.com",
         password: "different",
         fullname: "Test2",
         gender: "F",
         mobileno: "87654321",
         signuptype: "email"
-      });
+      },
+    });
 
     expect(res.statusCode).toBe(409);
     expect(res.body).toHaveProperty('error', 'Email already exists');
   });
 
   it('should fail on wrong login', async () => {
-    const res = await request(app)
-      .post('/api/auth/login')
-      .send({
+    const res = await performRequest(app, {
+      method: 'POST',
+      path: '/api/auth/login',
+      body: {
         email: "notfound@mail.com",
         password: "wrong"
-      });
-      
+      },
+    });
+
     expect(res.statusCode).toBe(401);
     expect(res.body).toHaveProperty('error', 'Invalid credentials');
   });

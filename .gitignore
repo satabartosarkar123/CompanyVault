@@ -122,6 +122,9 @@ dist
 temp/
 tmp/
 
+# Vercel local config
+.vercel/
+
 # Build outputs
 build/
 dist/
