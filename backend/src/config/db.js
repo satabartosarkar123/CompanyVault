@@ -21,7 +21,18 @@ if (process.env.NODE_ENV === 'test') {
   if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL is not defined.');
   }
-  pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+  const isLocalConnection = /localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL);
+
+  const connectionConfig = {
+    connectionString: process.env.DATABASE_URL,
+  };
+
+  if (!isLocalConnection) {
+    connectionConfig.ssl = { rejectUnauthorized: false };
+  }
+
+  pool = new Pool(connectionConfig);
 }
 
 export default pool;
